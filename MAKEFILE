@@ -1,0 +1,24 @@
+.asm.obj:
+ 	tasm $* /zi;
+
+all: lp486pkt.com
+
+lp486pkt.com: head.obj ir.obj il.obj tail.obj
+	tlink /t /3 head+ir+il+tail,lp486pkt;
+
+ir.obj: ir.asm defs.asm options.inc chip.inc 82596.incc
+	tasm ir /zi /w+;
+
+il.obj: il.asm defs.asm options.inc chip.inc 82596.inc messages.inc
+	tasm il /zi /w+;
+
+zip:
+	del *.obj
+	del *.map
+	pkzip -@filelist lp486pkt
+	pkzip lp486pkt @filelist
+
+clean:
+	del *.obj
+	del *.map
+	del lp486pkt.com
