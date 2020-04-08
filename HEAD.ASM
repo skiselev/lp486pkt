@@ -1,5 +1,3 @@
-;Licensed by Intel for distribution without complete source.
-
 	include	defs.asm
 
 cgroup	group	code,init,_text

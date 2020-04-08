@@ -1,5 +1,3 @@
-;History:2,1
-
 	include	options.inc
 	include	chip.inc
 	include	defs.asm
@@ -12,20 +10,14 @@ code	segment para public 'code'
 
 	even
 
-extrn	sys_features : byte
 extrn	is_186	: byte		;=0 if 808[68], =1 if 80[123]86.
 extrn	is_eisa	: byte		;=0 if ISA, =1 if EISA
 extrn	decout	: near
 extrn	int_no 			: byte
 extrn	int_num : word
-extrn	mem_map_io	: word
 extrn	base_addr : word
-extrn	send_pkt : near
 extrn	set_ether : near
 extrn	do_config : near
-extrn	config_mii_mode : byte
-extrn	config_cdt : byte
-extrn	config_duplex : byte
 extrn	reset_chip : near
 extrn	wait_27ms : near
 NOWARN
@@ -33,12 +25,7 @@ extrn	wait : near
 WARN
 extrn	do_timeout : near
 extrn	set_timeout : near
-extrn	timeout : word
-extrn	timeout_counter : word
-extrn	timeout_value : word
 
-extrn	multicast_fix : word
-extrn	issue_cmd : near
 extrn	wait_scb_non_active : near
 extrn	tx_buff_no : word
 extrn	buff_ptrs : word
@@ -51,8 +38,6 @@ extrn	first_rfd : word
 extrn	last_rfd : word
 extrn	first_rbd : word
 extrn	last_rbd : word
-extrn	enable_board_int : near
-extrn	disable_board_int : near
 	
 extrn	scb_buff	: word
 
@@ -67,11 +52,6 @@ end_free_mem	label	byte
 	include	getea.asm
 	include	messages.inc
 	
-last_timeout			dw ?
-copy_timeout			dw ?
-copy_timeout_counter	dw ?
-copy_timeout_value		dw ?
-
 cnvrt_to_phys_add	dw	?	; Address of subroutine to convert to physical add
 	even
 virtual_mem_struct:
@@ -84,13 +64,8 @@ virtual_mem_struct:
 	
 io_addr		dw	0,0		; I/O address specified on the command line
 
-found_one		db	0			; = 1 if one card is found
-
 	ALIGN	16
 self_test_buff	dd	0, -1		; Results of the self-test test placed here
-
-	ALIGN	16
-temp_buffer	db	80 dup (0)		; TX buffer for media detect
 
 	ALIGN	16
 scp_buff	db	size SCP_STRUC dup (0)
@@ -177,7 +152,6 @@ set_int_num:
 	mov		int_num, ax		; Set parameter_list int num.
 	call	setup_receive	; Setup receive buffers & start reception
 	call	set_recv_isr
-	call	enable_board_int
 	clc
 exit_etopen:
 	ret
@@ -501,67 +475,11 @@ config_chip	PROC	NEAR
 ; Set the Individual address registers with the Ethernet address
 	mov		si, offset cgroup:rom_address
 	call	set_ether
-;	mov		dx, offset cgroup:ether_add_msg
 	jc		short exit_config_chip	; Exit if there is a problem
 	clc
 exit_config_chip:
 	ret
 config_chip	ENDP
-
-send_on_connector	PROC	NEAR
-	mov		[di].tx_status, 0h
-	mov		scb_buff.scb_cbl_add, di
-	call	issue_cmd
-
-	mov		ax, 1					; Wait, if necessary, for about 27 msec
-	call	set_timeout
-wait_for_send:
-	mov		ax, [di].tx_status
-	test	ax, CB_STATUS_COMPLETE
-	jnz		short send_complete
-	call	do_timeout				; Any more time left ?
-	jnz		short wait_for_send		; Continue to wait if so
-
-	mov		scb_buff.scb_command, CU_ABORT	; Abort the command
-	CA
-error_send_on_connector:
-	stc								; Indicate failure
-    ret
-
-send_complete:
-    mov     ax, [di].tx_status		; Check if status bits are ok
-    test    ax, CB_STATUS_OK
-    jz		short error_send_on_connector
-    test    ax, CB_TX_NO_CARRIER_SENSE	; Also need to check for carrier
-    jnz     short error_send_on_connector
-	clc								; Indicate success
-	ret
-send_on_connector	ENDP
-
-setup_test_packet	PROC NEAR
-	mov		cx, RUNT
-	lea		di, temp_buffer		; Buffer to use for test packets
-	push	di					; Save start address of buffer
-	mov		eax, (EL_BIT + TRANSMIT)*10000h
-	stosd						; Store the action command word + status word
-	mov		ax, -1				; Set the address of next command to NULL
-	stosw						; Store the link address - next command
-	stosw						; TBD offset is also null
-	mov		ax, RUNT OR TX_EOF_BIT	; Set length of data
-	stosw
-	xor		ax, ax
-	stosw
-	mov		si, offset cgroup:rom_address	; Set destination address as us
-	movsd
-	movsw
-	mov		si, offset cgroup:rom_address
-	movsd
-	movsw
-    mov     ax, RUNT - EADDR_LEN*2 + 2 ; Set packet size (2 * address + size)
-    stosw
-	pop		di						; Recover start address of buffer
-    ret
-setup_test_packet	ENDP
 
 code	ends
 

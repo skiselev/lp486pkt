@@ -1,4 +1,3 @@
-
 REGS_R_32_BIT	EQU	1				; 32 bit registers need to be saved/restored
 
 AUTO_CONNECTOR  equ     0

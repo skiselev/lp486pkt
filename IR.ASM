@@ -1,5 +1,3 @@
-;History:2,1
-
 	include	options.inc
 	include	chip.inc
 	include	defs.asm
@@ -14,10 +12,6 @@ code	segment para public 'code'
 
 extrn ether_add_msg1 : word
 extrn ether_add_msg2 : word
-extrn their_timer : dword
-
-	public mem_map_io
-mem_map_io		dw	0,0		; Memory mapped I/O address from the command line
 
 	public tx_buff_no, buff_ptrs
 tx_buff_no		dw	?
@@ -877,15 +871,6 @@ timer_isr:
 ;if the first instruction is an iret, then the timer is not hooked
 	iret
 
-	public	enable_board_int
-enable_board_int	PROC	NEAR
-; FIXME: How to enable interrupts on LP486E?
-;	LOAD_PORT	PLXP_INTERRUPT_CONTROL
-;    mov     al, LATCHED_INTWRITE_BIT
-;    out     dx, al
-	ret
-enable_board_int	ENDP
-	
 	public	clear_interrupt_latch
 clear_interrupt_latch	PROC	NEAR
 	mov	dx, LP486E_CLEAR_INT_ADDR	; Clear interrupt latch
