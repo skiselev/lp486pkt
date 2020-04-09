@@ -2,6 +2,7 @@
 	include	chip.inc
 	include	defs.asm
 	include	82596.inc
+	include lp486e.inc
 
 cgroup	group code, _text, init
 
@@ -10,7 +11,6 @@ code	segment para public 'code'
 
 	even
 
-extrn	is_186	: byte		;=0 if 808[68], =1 if 80[123]86.
 extrn	is_eisa	: byte		;=0 if ISA, =1 if EISA
 extrn	decout	: near
 extrn	int_no 			: byte
@@ -83,12 +83,6 @@ iscp_buff	db	size ISCP_STRUC dup (0)
 ;-> the Ethernet address of the card.
 	extrn	rom_address: byte
 
-;print the character in al.
-	extrn	chrout: near
-
-;print a crlf
-	extrn	crlf: near
-
 ; Enter with si -> argument string.
 ; Skip spaces and tabs.  Exit with si -> first non-blank char.
 	extrn	skip_blanks: near
@@ -108,7 +102,7 @@ parse_args_exit:
 
 	public	print_parameters
 print_parameters:
-;echo our command-line parameters
+;echo our auto-detected parameters
 	mov		di, offset cgroup:int_no
 	mov		dx, offset cgroup:int_no_name
 	call	print_number
@@ -223,8 +217,7 @@ configure:
 	call	setup_cmd_buffs		; Setup buffer for commands
 	call	config_chip			; Configure chip
 	jc	short exit_etopen_chip
-;	call	do_select_media
-;FIXME: How to select media on LP486E?
+	call	print_media
 exit_etopen_chip:
 	ret
 etopen_failed:
@@ -386,6 +379,20 @@ eisa_nic_enabled:
 eisa_get_exit:
 	ret
 eisa_get_config ENDP
+
+print_media	PROC	NEAR
+	mov	dx, 0C02h
+	in	al, dx
+	or	al, 40h
+	jz	short print_aui
+	print	media_tpe_msg
+	jmp	short print_media_exit
+print_aui:
+	print	media_aui_msg
+print_media_exit:
+	ret
+print_media	ENDP
+
 
 setup_cmd_buffs	PROC	NEAR
 ; Setup buffer for commands

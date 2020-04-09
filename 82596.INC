@@ -1,25 +1,8 @@
-; Intel Professional Workstation Specific I/O addresses and IRQ
-LP486E_PORT_ADDR	equ	0CB0h		; Port commands address
-LP486E_CA_ADDR		equ	0CB4h		; Channel Attention address
-LP486E_CLEAR_INT_ADDR	equ	0CB8h		; Clear interrupt address
-
-LP486E_IRQ		equ	10		; Note: Can be changed from ECU
-;--------------------------------------
-
 ; Port commands
 RESET_CMD		equ	00h
 SELF_TEST_CMD		equ	01h
 ALT_SCP_CMD		equ	02h
 DUMP_CMD		equ	03h
-
-;- EEPROM And LAN (Intel 82596 / 82556) Control Register
-;- Register Bit Definitions
-LOAD_CONFIGURATION_BIT   equ     BIT_4
-LAN_0_RESET_BIT          equ     BIT_8
-SOFTWARE_RESET_BIT       equ     BIT_12
-
-;- MASTER CONTROL register bit definitions
-BURST_LENGTH_BIT         equ     BIT_12
 
 ; System Configuration Pointer (SCP) SYSBUS bit definitions
 SYSBUS_BIT_0			EQU	BIT_0		;Don't Care bit
@@ -230,23 +213,6 @@ rbd_size	dw	?				; Size of the buffer
 rbd_filler1	dw	?				; Not used
 rbd_voffset	dw	?				; Virtual offset to data buffer
 RBD_STRUCT	ends
-
-; Issue a Port command to the 82596
-PORT	MACRO
-	mov	dx, LP486E_PORT_ADDR
-	out	dx, ax			; Out low 16 bits
-	inc	dx
-	inc	dx
-	shr	eax, 16			; Out high 16 bits
-	out	dx, ax
-	ENDM
-
-; Issue a channel attention to the 82596	
-CA	MACRO
-	mov	dx, LP486E_CA_ADDR
-	xor	ax, ax
-	out	dx, ax
-	ENDM
 
 WAIT_CMD_ACCEPTED macro
 	local	lab1
