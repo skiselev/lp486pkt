@@ -1,10 +1,9 @@
 if LANGUAGE eq US_ENGLISH
 	public	usage_msg, copyright_msg
 
-bad_key_msg	db	"Unknown keyword on the command line.", CR,LF
 usage_msg	label	byte
 	db "usage: ",short_name
- 	db " [options] <packet_int_no> {irq_no}",CR,LF,'$'
+ 	db " [options] <packet_int_no>",CR,LF,'$'
 copyright_msg	label byte
 	db "Packet driver for ",long_name,", version "
 	db '0'+(majver / 10),'0'+(majver mod 10),".",'0'+version,CR,LF
@@ -26,7 +25,9 @@ int_no_name			db	"Interrupt number ",'$'
 io_addr_name		db	"I/O port ",'$'
 
 init_error_msg	db	"Failed to initialize Ethernet controller",CR,LF,'$'
-no_mac_msg	db	"Cannot find MAC address in EISA configuration area",CR,LF,'$'
+;no_mac_msg	db	"Cannot find MAC address in EISA configuration area",CR,LF,'$'
+eisa_config_error_msg	db	"Unable to read on-board Ethernet configuration from EISA BIOS",CR,LF,'$'
+eisa_nic_disabled_msg	db	"On-board Ethernet controller is disabled",CR,LF,'$'
 
 	public ether_add_msg1, ether_add_msg2
 ether_add_msg1		db	"Config failure - ethernet 1.",CR,LF,'$'

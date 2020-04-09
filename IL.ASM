@@ -15,7 +15,6 @@ extrn	is_eisa	: byte		;=0 if ISA, =1 if EISA
 extrn	decout	: near
 extrn	int_no 			: byte
 extrn	int_num : word
-extrn	base_addr : word
 extrn	set_ether : near
 extrn	do_config : near
 extrn	reset_chip : near
@@ -51,6 +50,9 @@ end_free_mem	label	byte
 	extrn	get_hex: near
 	include	getea.asm
 	include	messages.inc
+
+eisa_config	db	320 dup (0)
+eisa_sub_type	db	'NET,82596,SCSI,NCRC700'
 	
 cnvrt_to_phys_add	dw	?	; Address of subroutine to convert to physical add
 	even
@@ -75,10 +77,6 @@ iscp_buff	db	size ISCP_STRUC dup (0)
 
 	extrn	set_recv_isr: near
 
-;enter with si -> argument string, di -> wword to store.
-;if there is no number, don't change the number.
-	extrn	get_number: near
-
 ;enter with dx -> argument string, di -> wword to print.
 	extrn	print_number: near
 
@@ -98,21 +96,14 @@ iscp_buff	db	size ISCP_STRUC dup (0)
 	public	parse_args
 parse_args:
 ; Exit with nc if all went well, cy otherwise.
-	mov	di, offset cgroup:int_no
-	call	get_number
-parse_args_again:
 	call	skip_blanks
 	cmp	al, CR			; End of the arguments string?
 	je	short parse_args_done
-
-parse_args_2:
-	mov	dx, offset cgroup:bad_key_msg
-	mov	ah,9
-	int	21h
-	int	20h
-
+	stc				; Extra arguments, print usage
+	jmp	short parse_args_exit
 parse_args_done:
 	clc
+parse_args_exit:
 	ret
 
 	public	print_parameters
@@ -216,10 +207,8 @@ exit_virtual_address_convert:
 virtual_address_convert	ENDP
 
 etopen_chip	PROC	NEAR
-	cmp	int_no, 0
-	jne	short config_io_addr
-	mov	al, LP486E_IRQ
-	mov	int_no, al
+	call	eisa_get_config
+	jc	short exit_etopen_chip
 
 config_io_addr:
 	mov	ax, LP486E_PORT_ADDR
@@ -229,11 +218,6 @@ config_io_addr:
 	jc	short etopen_failed
 	call	init_scp			; Initialize the SCP, ISCP, SCB
 	jc	short etopen_failed
-scp_int_ok:
-	call	find_mac			; Get MAC address from EISA configuration area
-	jnc	short configure
-	mov	dx, offset cgroup:no_mac_msg
-	jmp	short exit_etopen_chip
 
 configure:
 	call	setup_cmd_buffs		; Setup buffer for commands
@@ -362,40 +346,46 @@ error_init_iscp:
 
 init_scp	ENDP
 
-
-find_mac	PROC	NEAR
-	; Search EISA configuration area 0E8000h-0E9FFFh for the MAC address
-	; The MAC should start with 00:AA:00
-	push	es
-	mov	ax,0E800h
-	mov	es,ax
-	mov	cx,02000h
-	mov	bx,0
-
-find_mac_loop:
-	cmp	byte ptr es:[bx], 00h
-	jne	short find_mac_next
-	cmp	byte ptr es:[bx+1], 0AAh
-	jne	short find_mac_next
-	cmp	byte ptr es:[bx+2], 00h
-	je	short find_mac_found
-
-find_mac_next:
-	inc	bx
-	loop	find_mac_loop
-	pop	es
-	stc				; MAC not found, signal an error
-	ret
-
-find_mac_found:
-	mov	eax, dword ptr es:[bx]
-	mov	dword ptr rom_address, eax
-	mov	ax, word ptr es:[bx+4]
-	mov	word ptr rom_address+4, ax
-	pop	es
+eisa_get_config	PROC	NEAR
+	xor	cx, cx			; CH = 0 (function 0), CL = 0 (slot 0)
+eisa_next_func:
+	mov	si, offset eisa_config
+	mov	ax, 0D801h		; INT 15, AH=D801 - read function
+	int	15h			; configuration information
+	jnc	short eisa_int15_success
+	mov	dx, offset eisa_config_error_msg
+	stc
+	jmp	short eisa_get_exit
+eisa_int15_success:
+	push	cx
+	push	cs
+	pop	es			; INT 15 trashes the ES, restore it
+	mov	di, offset eisa_sub_type
+	mov	si, offset eisa_config+23h ; function string for NIC config
+	mov	cx, 22			; string length
+	cld
+	rep	cmpsb			; compare strings
+	pop	cx
+	je	short eisa_config_found
+	inc	ch			; increment the function number
+	jmp	short eisa_next_func	; check next EISA function
+eisa_config_found:
+	test	byte ptr [eisa_config+94h],0FFh	; non-zero if NIC is enabled
+	jnz	short eisa_nic_enabled
+	mov	dx, offset eisa_nic_disabled_msg
+	stc
+	jmp	short eisa_get_exit
+eisa_nic_enabled:
+	mov	al, eisa_config+93h	; get NIC IRQ number
+	mov	int_no, al		; store it
+	mov	eax, dword ptr [eisa_config+88h] ; MAC address bytes 0-3
+	mov	dword ptr [rom_address], eax
+	mov	ax, word ptr [eisa_config+8Ch]	; MAC address bytes 4-5
+	mov	word ptr [rom_address+4], ax
 	clc
+eisa_get_exit:
 	ret
-find_mac	ENDP
+eisa_get_config ENDP
 
 setup_cmd_buffs	PROC	NEAR
 ; Setup buffer for commands

@@ -27,8 +27,7 @@ cmd_buff1		db	GIANT + 10h dup (?)
 	align	4
 cmd_buff2		db	GIANT + 10h dup (?)
 
-	public	base_addr, int_no
-base_addr	dw 	0000h		; I/O address as located via the I/O scan
+	public	int_no
 int_no		db	0,0,0,0		; must be four bytes long for get_number.
 
 	public	driver_class, driver_type, driver_name
