@@ -10,9 +10,9 @@ copyright_msg	label byte
 	db "Portions written by Sergey Kiselev and Morien W. Roberts; ",CR,LF,'$'
 
 need_eisa_msg		db	"An EISA BIOS is required for this driver.",CR,LF,'$'
-self_test_msg		db	"Performing self test of chip....",'$'
-self_test_ok_msg	db	" PASSED.",CR,LF,'$'
-self_test_no_msg	db	" FAILED.",CR,LF,'$'
+self_test_msg		db	"Performing self test of chip.... ",'$'
+self_test_ok_msg	db	"PASSED.",CR,LF,'$'
+self_test_no_msg	db	"FAILED.",CR,LF,'$'
 virtual_services	db	"Using virtual memory services of memory manager.",CR,LF,'$'
 no_virtual_services	db	"Not using any memory manager services.",CR,LF,'$'
 problem_in_phys_add	db	"Problem with virtual memory services.",CR,LF,'$'
