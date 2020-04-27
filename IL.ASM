@@ -4,10 +4,8 @@
 	include	82596.inc
 	include lp486e.inc
 
-cgroup	group code, _text, init
-
-code	segment para public 'code'
-	assume	cs:cgroup, ds:cgroup
+code	segment para public
+	assume	cs:code, ds:code
 
 	even
 
@@ -103,11 +101,11 @@ parse_args_exit:
 	public	print_parameters
 print_parameters:
 ;echo our auto-detected parameters
-	mov		di, offset cgroup:int_no
-	mov		dx, offset cgroup:int_no_name
+	mov		di, offset int_no
+	mov		dx, offset int_no_name
 	call	print_number
-	mov		di, offset cgroup:io_addr
-	mov		dx, offset cgroup:io_addr_name
+	mov		di, offset io_addr
+	mov		dx, offset io_addr_name
 	call	print_number
 	ret
 
@@ -118,7 +116,7 @@ etopen:
 	assume	ds:code
 	cmp	is_eisa, 1
 	je	have_eisa_bus
-	mov 	dx, offset cgroup:need_eisa_msg	; A EISA bus is required
+	mov 	dx, offset need_eisa_msg	; A EISA bus is required
 	stc
 	ret
 
@@ -150,11 +148,11 @@ check_virtual_mem_services	PROC	NEAR
 	test	BYTE PTR es:[007bh], 20h
 	jz	short no_virtual_services_found
 	print 	virtual_services	; Announce virtual DMA services present
-	mov	cnvrt_to_phys_add, offset cgroup:virtual_address_convert
+	mov	cnvrt_to_phys_add, offset virtual_address_convert
 	jmp	short exit_check_virtual_mem_services
 no_virtual_services_found:
 	print 	no_virtual_services	; Announce no virtual DMA services
-	mov	cnvrt_to_phys_add, offset cgroup:linear_address_convert
+	mov	cnvrt_to_phys_add, offset linear_address_convert
 exit_check_virtual_mem_services:
 	ret
 check_virtual_mem_services	ENDP
@@ -173,7 +171,7 @@ linear_address_convert	PROC	NEAR
 linear_address_convert	ENDP
 
 virtual_address_convert	PROC	NEAR
-	mov     di, offset cgroup:virtual_mem_struct
+	mov     di, offset virtual_mem_struct
 	; Lock the memory,
 	; which in turn returns the physical address in the DMA descriptor
 	mov     word ptr [di], 200h
@@ -221,7 +219,7 @@ configure:
 exit_etopen_chip:
 	ret
 etopen_failed:
-	mov	dx, offset cgroup:init_error_msg
+	mov	dx, offset init_error_msg
 	stc				; Give up.
 	ret
 etopen_chip	ENDP
@@ -230,7 +228,7 @@ test_chip	PROC	NEAR
 	print	self_test_msg		; Announce the start of the self test
 	mov	ax, cs
 	mov	es, ax
-	mov	si, offset cgroup:self_test_buff
+	mov	si, offset self_test_buff
 	call	cnvrt_to_phys_add
 	jnc	short cnvrt_ok
 	print	problem_in_phys_add
@@ -268,7 +266,7 @@ init_scp	PROC	NEAR
 ; Performs the alternate SCP and ISCP initialization for the 82596
 	mov	ax, cs			; Set Up the Alternate SCP Address
 	mov	es, ax
-	mov	si, offset cgroup:scp_buff
+	mov	si, offset scp_buff
 	call	cnvrt_to_phys_add
 	jc	error_init_scp
 	or	al, ALT_SCP_CMD
@@ -281,7 +279,7 @@ init_scp	PROC	NEAR
 ; Internal Triggering Of Timers, Active High Edge-Triggered Interrupt
 	mov	ax, SYSBUS_CSW OR SYSBUS_LOCK_DIS OR SYSBUS_32_MODE OR SYSBUS_BIT_0
 	mov     scp_buff.scp_sysbus, ax
-	mov	si, offset cgroup:iscp_buff
+	mov	si, offset iscp_buff
 	call	cnvrt_to_phys_add
 	jc	error_init_scp
 
@@ -398,8 +396,8 @@ setup_cmd_buffs	PROC	NEAR
 ; Setup buffer for commands
 	mov	word ptr cmd_buff1, C_DONE_BIT	; Mark buffer as available
 	mov	word ptr cmd_buff2, C_DONE_BIT	; Mark buffer as available
-	mov	buff_ptrs[0], offset cgroup:cmd_buff1	; Settup buffer 'array'
-	mov	buff_ptrs[2], offset cgroup:cmd_buff2
+	mov	buff_ptrs[0], offset cmd_buff1	; Settup buffer 'array'
+	mov	buff_ptrs[2], offset cmd_buff2
 	mov	tx_buff_no, 0		; Set next buffer # to use
 	ret
 setup_cmd_buffs	ENDP
@@ -408,11 +406,11 @@ setup_receive	PROC	NEAR
 	mov	cx, RBD_COUNT 		; Setup the receive buffer descriptors
 	mov	ax, cs
 	mov	es, ax
-	mov	si, offset cgroup:start_rx_buff
+	mov	si, offset start_rx_buff
 	mov	bx, si			; BX holds a copy of the virtual offset
 	call	cnvrt_to_phys_add
 	mov	esi, eax
-	mov	di, offset cgroup:start_rbd
+	mov	di, offset start_rbd
 	mov	first_rbd, di
 	mov	ax, di
 next_rbd:
@@ -431,10 +429,10 @@ next_rbd:
 	sub	di, size rbd_struct	; Return to previous RBD
 	mov	last_rbd, di
 	or	[di].rbd_size, EL_BIT	; Mark end of chain
-	mov	[di].rbd_link, offset cgroup:start_rbd
+	mov	[di].rbd_link, offset start_rbd
 
 	mov	cx, RFD_COUNT 		; Setup the receive buffer descriptors
-	mov	di, offset cgroup:start_rfd
+	mov	di, offset start_rfd
 	mov	first_rfd, di
 	mov	ax, di
 next_rfd:
@@ -451,12 +449,12 @@ next_rfd:
 	sub	di, size rfd_struct	; Get back to last RFD
 	mov	last_rfd, di
 	mov	[di].rfd_eol, EL_BIT+FLEXIBLE_MODE	; Mark end of chain
-	mov	[di].rfd_link, offset cgroup:start_rfd	; Wrap around to start
+	mov	[di].rfd_link, offset start_rfd		; Wrap around to start
 							; Setup the start rdf to point to the start rbd
-	mov	[start_rfd].rfd_ptr, offset cgroup:start_rbd	
+	mov	[start_rfd].rfd_ptr, offset start_rbd	
 
 	WAIT_CMD_ACCEPTED 		; Wait for acceptance of last command
-	mov	scb_buff.scb_rfa_add, offset cgroup:start_rfd
+	mov	scb_buff.scb_rfa_add, offset start_rfd
 	mov	scb_buff.scb_command, RU_START
 	CA
 	ret
@@ -464,13 +462,13 @@ setup_receive	ENDP
 
 config_chip	PROC	NEAR
 	call	do_config
-	mov	dx, offset cgroup:config_msg
+	mov	dx, offset config_msg
 	jc	short exit_config_chip	; Exit if there is a problem
 
 	mov	ax, 8			; Wait for the command
 	call	wait
 ; Set the Individual address registers with the Ethernet address
-	mov	si, offset cgroup:rom_address
+	mov	si, offset rom_address
 	call	set_ether
 	jc	short exit_config_chip	; Exit if there is a problem
 	clc

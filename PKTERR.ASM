@@ -19,10 +19,8 @@ err15	db	"Couldn't reset/initialize interface (more than 1 handle open)",'$'
 err16	db	"An invalid iocb was specified",'$'
 errunk	db	"Unknown error",'$'
 
-errlist	dw	cgroup:err0, cgroup:err1, cgroup:err2, cgroup:err3, cgroup:err4
-		dw	cgroup:err5, cgroup:err6, cgroup:err7, cgroup:err8, cgroup:err9 
-		dw	cgroup:err10, cgroup:err11, cgroup:err12, cgroup:err13
-		dw	cgroup:err14, cgroup:err15, cgroup:err16
+errlist	dw	err0, err1, err2, err3, err4, err5, err6, err7, err8
+	dw	err9, err10, err11, err12, err13, err14, err15, err16
 error_count	equ	($ - errlist)/2
 
 fatal_error:
@@ -48,7 +46,7 @@ print_error:
 
 	mov	bl,dh
 	xor	bh,bh
-	mov	dx,offset cgroup:errunk	;in case we don't know about it.
+	mov	dx,offset errunk	;in case we don't know about it.
 	cmp	bl,error_count		;Do we know about this error number?
 	jae	print_error_2		;  no, bail out.
 	shl	bx,1

@@ -5,13 +5,13 @@
 ;count.  Then we double it and add it to our timeout_counter.  When it overflows,
 ;then we've waited a tick of 27.5 ms.
 
-		public timeout, timeout_counter, timeout_value
+	public	timeout, timeout_counter, timeout_value
 
 timeout		dw	?		;number of ticks to wait.
 timeout_counter	dw	?		;old counter zero value.
 timeout_value	dw	?
 
-	public set_timeout
+	public	set_timeout
 set_timeout:
 ;enter with ax = number of ticks (36.4 ticks per second).
 	inc	ax			;the first times out immediately.

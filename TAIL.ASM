@@ -1,26 +1,27 @@
-;   Copyright 1988-1996 Russell Nelson.
+;   PC/FTP Packet Driver source, conforming to version 1.05 of the spec
+;   Updated to version 1.08 Feb. 17, 1989.
+;   Copyright 1988-1993 Russell Nelson
+
+;   This program is free software; you can redistribute it and/or modify
+;   it under the terms of the GNU General Public License as published by
+;   the Free Software Foundation, version 1.
+;
+;   This program is distributed in the hope that it will be useful,
+;   but WITHOUT ANY WARRANTY; without even the implied warranty of
+;   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;   GNU General Public License for more details.
+;
+;   You should have received a copy of the GNU General Public License
+;   along with this program; if not, write to the Free Software
+;   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 	include	defs.asm
 
-cgroup	group	code,init,_text
-
-code	segment para public 'code'
-code	ends
-
-_text	segment para public 'code'
-_text	ends
-
-;-> last byte of static memory used by driver-dependent code.
-	extrn	end_resident: byte
-	extrn	end_free_mem: byte
-
-init	segment para public 'code'
-	assume	cs:cgroup, ds:cgroup
+code	segment word public
+	assume	cs:code, ds:code
 
 	public	is_eisa
 is_eisa	db	0			;=0 if ISA, =1 if EISA
-	public	is_pci
-is_pci	db	0			;=0 if PCI, =1 if PCI
 	extrn	sys_features: byte	;bitmask of system features.
 	extrn	is_186: byte		;=0 if 808[68], =1 if 80[1234]86.
 	extrn	is_286: byte		;=0 if 80[1]8[68], =1 if 80[234]86.
@@ -29,6 +30,10 @@ is_pci	db	0			;=0 if PCI, =1 if PCI
 	extrn	hw_int_no: byte		;the 8259 interrupt level.
 	extrn	driver_class: byte	;the class of this driver, per the spec.
 	extrn	rcv_modes: word		;count of modes followed by mode handles.
+
+;-> last byte of static memory used by driver-dependent code.
+	extrn	end_resident: byte
+	extrn	end_free_mem: byte
 
 ;-> the fixed address of the card.
 	extrn	rom_address: byte
@@ -46,7 +51,7 @@ is_pci	db	0			;=0 if PCI, =1 if PCI
 	include	crlf.asm
 	include	chrout.asm
 
-free_mem	dw	cgroup:end_resident	;allocate memory from here.
+free_mem	dw	end_resident	;allocate memory from here.
 ;also see memory_to_keep.
 
 	public	malloc
@@ -54,7 +59,7 @@ malloc:
 ;enter with dx = amount of memory desired.
 ;exit with nc, dx -> that memory, or cy if there isn't enough memory.
 	add	dx,free_mem		;make a pointer after that much memory.
-	cmp	dx,offset cgroup:end_free_mem	;is it still in the free area?
+	cmp	dx,offset end_free_mem	;is it still in the free area?
 	ja	malloc_1		;no, we're in trouble.
 	xchg	dx,free_mem		;get the pointer back, store ptr->end.
 	clc
@@ -85,7 +90,9 @@ db '$'
 	extrn	copyright_msg: byte
 
 copyleft_msg	label	byte
- db "Packet driver skeleton copyright 1988-96, Crynwr Software.",CR,LF
+ db "Packet driver skeleton copyright 1988-93, Crynwr Software.",CR,LF
+ db "This program is freely copyable; source must be available; NO WARRANTY.",CR,LF
+ db "See the file COPYING.DOC for details; send FAX to +1-315-268-9201 for a copy.",CR,LF
  db CR,LF,'$'
 
 no_resident_msg	label	byte
@@ -144,25 +151,25 @@ etopen_diagn	db	0		; errorlevel from etopen if set
 ;can issue the error message and quit to dos.
 	extrn	etopen: near
 
-memory_to_keep	dw	cgroup:end_resident	;keep at least this much memory.
+memory_to_keep	dw	end_resident	;keep at least this much memory.
 ;also see free_mem.
 
 already_error:
-	mov	dx,offset cgroup:already_msg
+	mov	dx,offset already_msg
 already_error_1:
-	mov	di,offset cgroup:entry_point
+	mov	di,offset entry_point
 	call	print_number
 	mov	ax,4c05h		; give errorlevel 5
 	int	21h
 
 usage_error:
-	mov	dx,offset cgroup:usage_msg
+	mov	dx,offset usage_msg
 	mov	ah,9
 	int	21h
-	mov	dx,offset cgroup:options_msg
+	mov	dx,offset options_msg
 	cmp	word ptr driver_class,BLUEBOOK + IEEE8023*256	;both present?
 	jne	error
-	mov	dx,offset cgroup:options_i_msg
+	mov	dx,offset options_i_msg
 	public	error
 error:
 	mov	ah,9
@@ -176,34 +183,22 @@ error:
 start_1:
 	cld
 
-	mov	dx,offset cgroup:copyright_msg
+	mov	dx,offset copyright_msg
 	mov	ah,9
 	int	21h
 
-	mov	dx,offset cgroup:copyleft_msg
+	mov	dx,offset copyleft_msg
 	mov	ah,9
 	int	21h
 
-	mov	dx,offset cgroup:branding_msg
+	mov	dx,offset branding_msg
 	mov	ah,9
 	int	21h
-
-;** Identify the bus type (PCI, EISA, 8-bit ISA, 16-bit ISA, MCA)
-
-	xor	cx,cx
-	xor	dx,dx
-	mov	ax,0b101h		;PCI BIOS present?
-	int	1ah
-	jc	not_pci
-	cmp	dx,'CP'
-	jne	not_pci
-	inc	is_pci			;yes.
-not_pci:
 
 	mov	dx,0f000h		;ROM segment
 	mov	es,dx
 	mov	di,0ffd9h
-	mov	si,offset cgroup:eisa_signature
+	mov	si,offset eisa_signature
 	mov	cx,2
 	repe	cmpsw
 	jne	not_eisa
@@ -226,7 +221,7 @@ look_in_ROM:
 	cmp	byte ptr es:[0fffeh],0fch;is this an AT?
 	jne	identified		;no.
 	or	sys_features,TWO_8259	; ATs have 2nd 8259
-	jmp	short identified	; assume no microchannel
+	jmp	identified		; assume no microchannel
 got_features:
 	mov	ah,es:[bx+2]		; model byte
 	cmp	ah,0fch
@@ -269,7 +264,7 @@ identified:
 
 processor_identified:
 
-	mov	si,offset cgroup:phd_dioa+1
+	mov	si,offset phd_dioa+1
 	call	skip_blanks		;end of line?
 	cmp	al,CR
 	je	usage_error_j_1
@@ -311,7 +306,7 @@ not_u_opt:
 	cmp	al,'i'
 	jne	not_i_opt
 	cmp	word ptr driver_class,BLUEBOOK + IEEE8023*256	;both present?
-	mov	dx,offset cgroup:no_ieee_msg
+	mov	dx,offset no_ieee_msg
 	jne	usage_error_j_1		;no - give error
 	mov	word ptr driver_class,IEEE8023 + BLUEBOOK*256	;yes, swap them.
 	jmp	chk_options
@@ -320,7 +315,7 @@ usage_error_j_1:
 	jmp	usage_error
 no_more_opt:
 
-	mov	di,offset cgroup:entry_point	;parse the packet interrupt number
+	mov	di,offset entry_point	;parse the packet interrupt number
 	call	get_number		;  for them.
 
 	test	flagbyte,U_OPTION	;should we terminate the driver?
@@ -349,10 +344,10 @@ terminate_check_int_1:
 	mov	entry_point,al
 	cmp	entry_point_fnd,0	;did we find one?
 	jne	terminate_int_ok	;yes.
-	mov	dx,offset cgroup:no_pkt_msg	;no packet drivers installed!
+	mov	dx,offset no_pkt_msg	;no packet drivers installed!
 	jmp	error
 terminate_check_int_2:
-	mov	dx,offset cgroup:two_pkts_msg	;two packet drivers - which one??
+	mov	dx,offset two_pkts_msg	;two packet drivers - which one??
 	jmp	error
 
 terminate_int_ok:
@@ -361,7 +356,7 @@ terminate_int_ok:
 	jmp	error
 terminate_1:
 	je	terminate_2		;go if we found a signature.
-	mov	dx,offset cgroup:no_pkint_msg	;no packet driver there.
+	mov	dx,offset no_pkint_msg	;no packet driver there.
 	jmp	already_error_1
 terminate_2:
 
@@ -380,9 +375,9 @@ terminate_2:
 	mov	bx,dx			;their type from driver_info().
 	mov	dl,cl			;their number from driver_info().
 	mov	cx,2			;use type length 2.
-	mov	si,offset cgroup:bogus_type
+	mov	si,offset bogus_type
 	movseg	es,cs
-	mov	di,offset cgroup:our_recv
+	mov	di,offset our_recv
 	pushf
 	cli
 	call	their_isr
@@ -403,7 +398,7 @@ terminate_2:
 	call	their_isr
 	int	20h
 now_close:
-	mov	dx,offset cgroup:terminated_msg
+	mov	dx,offset terminated_msg
 	mov	ah,9
 	int	21h
 	int	20h
@@ -437,7 +432,7 @@ packet_int_unused:
 	cmp	int_no,7		;make sure that the packet interrupt
 	jbe	int_ok_7		;  number is in range.
 int_bad:
-	mov	dx,offset cgroup:int_msg
+	mov	dx,offset int_msg
 	jmp	error
 int_ok_7:
 	cmp	int_no,5		;Are they trying to use irq 5 on an XT?
@@ -451,7 +446,7 @@ int_ok_7:
 
 	or	al,al			;do they have one?
 	je	int_ok			;unbelievably, no.
-	mov	dx,offset cgroup:xt_hd_warn_msg
+	mov	dx,offset xt_hd_warn_msg
 	mov	ah,9
 	int	21h
 int_ok:
@@ -472,66 +467,66 @@ no_mapping_needed:
 ; Save part of the tail, needed by delayed etopen
 	test	flagbyte,D_OPTION
 	jz	open_now
-	mov	memory_to_keep,offset cgroup:end_tail_1	; save first part of tail
+	mov	memory_to_keep,offset end_tail_1	; save first part of tail
 	jmp	delayed_open_1
 open_now:
-	or	flagbyte,CALLED_ETOPEN
 	call	etopen			;init the driver.  If any errors,
 					;this routine returns cy.
 	jnc	yes_resident
 	jmp	no_resident
 
 yes_resident:
-	mov	si,offset cgroup:rom_address	;copy their original address to
+	mov	si,offset rom_address	;copy their original address to
 	movseg	es,ds
-	mov	di,offset cgroup:my_address	;  their current address.
+	mov	di,offset my_address	;  their current address.
 	mov	cx,MAX_ADDR_LEN/2
 	rep	movsw
 
 ; tell them what kind of system they have.
-	mov	dx,offset cgroup:system_msg
+	mov	dx,offset system_msg
 	mov	ah,9
 	int	21h
 
-	mov	dx,offset cgroup:i386_msg
+	mov	dx,offset i386_msg
 	cmp	is_386,0
 	jne	have_processor
-	mov	dx,offset cgroup:i286_msg
+	mov	dx,offset i286_msg
 	cmp	is_286,0
 	jne	have_processor
-	mov	dx,offset cgroup:i186_msg
+	mov	dx,offset i186_msg
 	cmp	is_186,0
 	jne	have_processor
-	mov	dx,offset cgroup:i8088_msg
+	mov	dx,offset i8088_msg
 have_processor:
 	mov	ah,9
 	int	21h
 
-	mov	dx,offset cgroup:mca_msg
+	mov	dx,offset mca_msg
 	test	sys_features,SYS_MCA
 	jne	have_bus
-	mov	dx,offset cgroup:eisa_msg
+	mov	dx,offset eisa_msg
 	cmp	is_eisa,0
 	jne	have_bus
-	mov	dx,offset cgroup:isa_msg
+	mov	dx,offset isa_msg
 have_bus:
 	mov	ah,9
 	int	21h
 
 	test	sys_features,TWO_8259
 	je	only_one_8259
-	mov	dx,offset cgroup:two_8259_msg
+	mov	dx,offset two_8259_msg
 	mov	ah,9
 	int	21h
 only_one_8259:
 
 	call	crlf
 
-	mov	di,offset cgroup:entry_point
-	mov	dx,offset cgroup:entry_point_name
+	mov	di,offset entry_point
+	mov	dx,offset entry_point_name
 	call	print_number
 
 	call	print_parameters	;echo our parameters.
+	or	flagbyte,CALLED_ETOPEN
 
 	cmp	driver_class,BLUEBOOK	;Blue Book Ethernet?
 	je	print_eaddr		;yes.
@@ -539,11 +534,11 @@ only_one_8259:
 	jne	print_addr_2		;no, don't print what we don't have.
 
 print_eaddr:
-	mov	dx,offset cgroup:eaddr_msg
+	mov	dx,offset eaddr_msg
 	mov	ah,9
 	int	21h
 
-	mov	si,offset cgroup:rom_address
+	mov	si,offset rom_address
 	call	print_ether_addr
 
 	call	crlf
@@ -553,7 +548,7 @@ print_addr_2:
 	cmp	driver_class,8		;ARCnet?
 	jne	print_addr_3		;no, don't print what we don't have.
 
-	mov	dx,offset cgroup:aaddr_msg
+	mov	dx,offset aaddr_msg
 	mov	ah,9
 	int	21h
 
@@ -572,7 +567,7 @@ delayed_open_1:
 	mov	their_isr.segm,es
 
 	mov	ah,25h			;install our packet interrupt
-	mov	dx,offset cgroup:our_isr
+	mov	dx,offset our_isr
 	int	21h
 
 	mov	ah,49h			;free our environment, because
@@ -606,7 +601,7 @@ no_resident:
 	mov	ah,9			;print their error message.
 	int	21h
 
-	mov	dx,offset cgroup:no_resident_msg
+	mov	dx,offset no_resident_msg
 	mov	ah,9
 	int	21h
 
@@ -650,6 +645,6 @@ no_et_diagn:
 	public	branding_msg
 branding_msg	db	'$'
 
-init	ends
+code	ends
 
 	end

@@ -1,9 +1,22 @@
 	include	defs.asm
 
-cgroup	group	code,init,_text
+;  Copyright, 1988-1993, Russell Nelson, Crynwr Software
 
-code	segment para public 'code'
-	assume	cs:cgroup, ds:cgroup
+;   This program is free software; you can redistribute it and/or modify
+;   it under the terms of the GNU General Public License as published by
+;   the Free Software Foundation, version 1.
+;
+;   This program is distributed in the hope that it will be useful,
+;   but WITHOUT ANY WARRANTY; without even the implied warranty of
+;   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;   GNU General Public License for more details.
+;
+;   You should have received a copy of the GNU General Public License
+;   along with this program; if not, write to the Free Software
+;   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+code	segment word public
+	assume	cs:code, ds:code
 
 	public	phd_environ
 	org	2ch
@@ -130,38 +143,12 @@ errors_in	dw	?,?
 errors_out	dw	?,?
 packets_dropped	dw	?,?		;dropped due to no type handler.
 
-REGS_R_32_BIT	EQU	1
-
-REG_16	MACRO	param
-param	dw	?
-ifdef REGS_R_32_BIT
-		dw	?
-endif
-ENDM
-
-REG_8	MACRO	param1, param2
-	param1	db	?
-	param2	db	?
-ifdef REGS_R_32_BIT
-		dw	?
-endif
-ENDM
-
-ifdef REGS_R_32_BIT
-	REG_WORD_SIZE equ	2
-else
-	REG_WORD_SIZE equ	1
-endif
-
 savespss	label	dword
-savesp		dw	(?)		;saved during the stack swap.
+savesp		dw	?		;saved during the stack swap.
 savess		dw	?
 
 their_recv_isr	dd	0		; original owner of board int
-	public their_timer
 their_timer	dd	0
-
-
 
 ;
 ; The following structure is used to access the registers pushed by the
@@ -169,15 +156,15 @@ their_timer	dd	0
 ; changing the "bytes" structure given below.
 ;
 regs	struc				; stack offsets of incoming regs
-_ES		dw	?
-_DS		dw	?
-REG_16 _BP
-REG_16 _DI
-REG_16 _SI
-REG_16 _DX
-REG_16 _CX
-REG_16 _BX
-REG_16 _AX
+_ES	dw	?
+_DS	dw	?
+_BP	dw	?
+_DI	dw	?
+_SI	dw	?
+_DX	dw	?
+_CX	dw	?
+_BX	dw	?
+_AX	dw	?
 _IP	dw	?
 _CS	dw	?
 _F	dw	?			; flags, Carry flag is bit 0
@@ -193,16 +180,20 @@ EI	equ	0200h
 ;
 ; This structure is a bytewise version of the "regs" structure above.
 ;
-bytes	struc					; stack offsets of incoming regs
-	dw	?						; es, ds, are 16 bits
+bytes	struc				; stack offsets of incoming regs
+	dw	?			; es, ds, bp, di, si are 16 bits
 	dw	?
-	dw	REG_WORD_SIZE dup (?) 	; bp, di, si are 16 (or 32) bits
-	dw	REG_WORD_SIZE dup (?)
-	dw	REG_WORD_SIZE dup (?)
-REG_8	_DL, _DH
-REG_8	_CL, _CH
-REG_8	_BL, _BH
-REG_8	_AL, _AH
+	dw	?
+	dw	?
+	dw	?
+_DL	db	?
+_DH	db	?
+_CL	db	?
+_CH	db	?
+_BL	db	?
+_BH	db	?
+_AL	db	?
+_AH	db	?
 bytes	ends
 
 	public	their_isr
@@ -216,22 +207,22 @@ our_isr:
 
 
 our_isr_open:
-	PUSH_16_32	ax			; save lots of registers
-	PUSH_16_32	bx
-	PUSH_16_32	cx
-	PUSH_16_32	dx
-	PUSH_16_32	si
-	PUSH_16_32	di
-	PUSH_16_32	bp
+	push	ax			; save lots of registers
+	push	bx
+	push	cx
+	push	dx
+	push	si
+	push	di
+	push	bp
 	push	ds
 	push	es
 
 	call	etopen			; init the card
 	jc	our_isr_no_init
 
-	mov	si,offset cgroup:rom_address	;copy their original address to
+	mov	si,offset rom_address	;copy their original address to
 	movseg	es,ds
-	mov	di,offset cgroup:my_address	;  their current address.
+	mov	di,offset my_address	;  their current address.
 	mov	cx,MAX_ADDR_LEN/2
 	rep	movsw
 
@@ -242,39 +233,36 @@ our_isr_open:
 	clc
 
 our_isr_no_init:
-	pop		es			; restore lots of registers
-	pop		ds
-	POP_16_32	bp
-	POP_16_32	di
-	POP_16_32	si
-	POP_16_32	dx
-	POP_16_32	cx
-	POP_16_32	bx
-	POP_16_32	ax
+	pop	es			; restore lots of registers
+	pop	ds
+	pop	bp
+	pop	di
+	pop	si
+	pop	dx
+	pop	cx
+	pop	bx
+	pop	ax
 	mov	dh,CANT_RESET		; (actually can't initialize)
-;	jc	our_isr_error
-jnc	qqq
-jmp	our_isr_error
-qqq:
+	jc	our_isr_error
 	or	flagbyte,CALLED_ETOPEN	; remember this fact
 	jmp	short our_isr_cont
 
 
 our_isr_0:
 	assume	ds:nothing
-	PUSH_16_32	ax
-	PUSH_16_32	bx
-	PUSH_16_32	cx
-	PUSH_16_32	dx
-	PUSH_16_32	si
-	PUSH_16_32	di
-	PUSH_16_32	bp
-	push		ds
-	push		es
+	push	ax
+	push	bx
+	push	cx
+	push	dx
+	push	si
+	push	di
+	push	bp
+	push	ds
+	push	es
 	cld
 	mov	bx,cs			;set up ds.
 	mov	ds,bx
-	assume	ds:cgroup
+	assume	ds:code
 	mov	bp,sp			;we use bp to access the original regs.
 	and	_F[bp],not CY		;start by clearing the carry flag.
 
@@ -286,10 +274,7 @@ our_isr_ei:
   endif
 
 	test	flagbyte,CALLED_ETOPEN	; have we initialized the card?
-;	jz	our_isr_open		; no
-jnz	our_isr_cont
-jmp	our_isr_open		; no
-
+	jz	our_isr_open		; no
 our_isr_cont:
 	mov	bl,ah			;jump to the correct function.
 	xor	bh,bh
@@ -305,15 +290,15 @@ our_isr_cont:
 	assume	ds:nothing
 	jc	our_isr_error
 our_isr_return:
-	pop			es
-	pop			ds
-	POP_16_32	bp
-	POP_16_32	di
-	POP_16_32	si
-	POP_16_32	dx
-	POP_16_32	cx
-	POP_16_32	bx
-	POP_16_32	ax
+	pop	es
+	pop	ds
+	pop	bp
+	pop	di
+	pop	si
+	pop	dx
+	pop	cx
+	pop	bx
+	pop	ax
 	iret
 
 our_isr_error:
@@ -324,7 +309,7 @@ our_isr_error:
 	jmp	short our_isr_return
 
 f_bad_command:
-	assume	ds:cgroup
+	assume	ds:code
 	extrn	bad_command_intercept: near
 	mov	bx,_BX[bp]
 	call	bad_command_intercept
@@ -357,10 +342,10 @@ f_driver_info:
 	jne	f_driver_info_1		; ne = incorrect, fail
 
 					;For enhanced PD, if they call
-	cmp	_BX[bp],offset cgroup:handles	;with a handle, give them the
+	cmp	_BX[bp],offset handles	;with a handle, give them the
 					;class they think it is
 	jb	default_handle
-	cmp	_BX[bp],offset cgroup:end_handles ;otherwise default to first class
+	cmp	_BX[bp],offset end_handles ;otherwise default to first class
 	jae	default_handle
 	mov	bx, _BX[bp]
 	cmp	[bx].in_use,0		;if it's not in use, it's bad.
@@ -380,7 +365,7 @@ got_handle:
 	mov	_DX[bp],ax
 	mov	_CL[bp],0		;number zero.
 	mov	_DS[bp],ds		; point to our name in their ds:si
-	mov	_SI[bp],offset cgroup:driver_name
+	mov	_SI[bp],offset driver_name
 	mov	al,driver_function
 	mov	_AL[bp],al
 	clc
@@ -446,7 +431,7 @@ f_set_multicast_list:
 f_set_multicast_list_1:
 	mov	multicast_count,ax	;remember the number of addresses.
 	movseg	es,cs
-	mov	di,offset cgroup:multicast_addrs
+	mov	di,offset multicast_addrs
 	push	ds
 	mov	ds,_ES[bp]		; get ds:si -> new list.
 	mov	si,_DI[bp]
@@ -455,7 +440,7 @@ f_set_multicast_list_1:
 	pop	cx
 	pop	ds
 
-	mov	si,offset cgroup:multicast_addrs
+	mov	si,offset multicast_addrs
 	call	set_multicast_list
 	ret
 f_set_multicast_list_2:
@@ -470,7 +455,7 @@ f_set_multicast_list_3:
 
 f_get_multicast_list:
 	mov	_ES[bp],ds		;return what we have remembered.
-	mov	_DI[bp],offset cgroup:multicast_addrs
+	mov	_DI[bp],offset multicast_addrs
 	mov	ax,EADDR_LEN		;multiply the count by the length.
 	mul	multicast_count
 	mov	_CX[bp],ax		;because they want total bytes.
@@ -481,7 +466,7 @@ f_get_multicast_list:
 f_get_statistics:
 	call	verify_handle		;just in case.
 	mov	_DS[bp],ds
-	mov	_SI[bp],offset cgroup:statistics_list
+	mov	_SI[bp],offset statistics_list
 	clc
 	ret
 
@@ -508,7 +493,7 @@ access_type_bad:
 
 ;register caller of pkt TYPE
 f_access_type:
-	mov	bx, offset cgroup:driver_class
+	mov	bx, offset driver_class
 access_type_9:
 	mov	al, [bx]		;get the next class.
 	inc	bx
@@ -536,7 +521,7 @@ access_type_3:
 ; handles to see if they're replicating a packet type.
 
 	mov	free_handle,0		;remember no free handle yet.
-	mov	bx,offset cgroup:handles
+	mov	bx,offset handles
 access_type_4:
 	cmp	[bx].in_use,0		;is this handle in use?
 	je	access_type_5		;no - don't check the type.
@@ -558,7 +543,7 @@ access_type_8:
 	lea	si,[bx].packet_type
 	or	cx,cx			; pass-all TYPE? (zero TYPE length)
 	jne	access_type_7		; ne = no
-	mov	bx,offset cgroup:handles+(MAX_HANDLE-1)*(size per_handle)
+	mov	bx,offset handles+(MAX_HANDLE-1)*(size per_handle)
 	jmp	short access_type_5	; put pass-all last
 access_type_7:
 	repe	cmpsb
@@ -573,12 +558,14 @@ access_type_5:				;handle is not in use
 	mov	free_handle,bx		;remember a free handle
 access_type_6:
 	add	bx,(size per_handle)	;go to the next handle.
-	cmp	bx,offset cgroup:end_handles	;examined all handles?
+	cmp	bx,offset end_handles	;examined all handles?
 	jb	access_type_4		;no, continue.
 
 	mov	bx,free_handle		;did we find a free handle?
 	or	bx,bx
 	je	access_type_space	;no - return error.
+
+	mov	[bx].in_use,1		;remember that we're using it.
 
 	mov	ax,_DI[bp]		;remember the receiver type.
 	mov	[bx].receiver.offs,ax
@@ -604,8 +591,6 @@ access_type_6:
 
 	mov	al, _AL[bp]
 	mov	[bx].class, al
-
-	mov	[bx].in_use,1		;remember that we're using it.
 
 	mov	_AX[bp],bx		;return the handle to them.
 
@@ -677,7 +662,7 @@ f_send_pkt_2:
 f_send_pkt_3:
 	call	send_pkt
 	ret
-	assume	ds:cgroup
+	assume	ds:code
 
 
 f_as_send_pkt:
@@ -699,7 +684,7 @@ f_as_send_pkt_1:
 ;ds:si -> buffer, cx = length, es:di -> iocb.
 	call	as_send_pkt
 	pop	ds
-	assume	ds:cgroup
+	assume	ds:code
 	ret
 f_as_send_pkt_2:
 	mov dh,	BAD_COMMAND		; return an error.
@@ -712,7 +697,7 @@ f_drop_pkt:
 	test	driver_function,4	; is this a high-performance driver?
 	je	f_as_send_pkt_2		; no.
 	push	ds			; Preserve ds
-	mov	si,offset cgroup:send_head	; Get head offset
+	mov	si,offset send_head	; Get head offset
 dp_loop:
 	mov	ax,ds:[si]		; Get offset
 	mov	dx,ds:[si+2]		; Get segment
@@ -821,7 +806,7 @@ f_get_address:
 	jb	get_address_space	;no.
 	mov	cx,address_len		;yes - get our address length.
 	mov	_CX[bp],cx		;Tell them how long our address is.
-	mov	si,offset cgroup:my_address	;copy it into their area.
+	mov	si,offset my_address	;copy it into their area.
 	rep	movsb
 	clc
 	ret
@@ -847,13 +832,13 @@ f_set_address:
 	mov	si,_DI[bp]		; set pointer, ds:si is ready
 	mov	ax,cs
 	mov	es,ax
-	mov	di,offset cgroup:my_address
+	mov	di,offset my_address
 	rep	movsb
 	mov	ds,ax			;restore ds.
-	assume	ds:cgroup
+	assume	ds:code
 
 	mov	cx,_CX[bp]		;get the desired address length.
-	mov	si,offset cgroup:my_address
+	mov	si,offset my_address
 	call	set_address
 	jc	f_set_address_err	;Did it work?
 
@@ -873,8 +858,8 @@ f_set_address_too_long:
 	ret
 f_set_address_err:
 ;we get here with cy set - leave it set.
-	mov	si,offset cgroup:rom_address	;we can't set the address, restore
-	mov	di,offset cgroup:my_address	;  to original.
+	mov	si,offset rom_address	;we can't set the address, restore
+	mov	di,offset my_address	;  to original.
 	mov	cx,MAX_ADDR_LEN/2
 	rep	movsw
 	ret
@@ -890,11 +875,11 @@ f_reset_interface:
 ; Stop the packet driver doing upcalls. Also a following terminate will
 ; always succed (no in use handles any longer).
 f_stop:
-	mov	bx,offset cgroup:handles
+	mov	bx,offset handles
 f_stop_2:
 	mov	[bx].in_use,0
 	add	bx,(size per_handle)	; next handle
-	cmp	bx,offset cgroup:end_handles
+	cmp	bx,offset end_handles
 	jb	f_stop_2
 	clc
 	ret
@@ -909,19 +894,19 @@ f_get_parameters:
 	ret
 f_get_parameters_1:
 	mov	_ES[bp],cs
-	mov	_DI[bp],offset cgroup:parameter_list
+	mov	_DI[bp],offset parameter_list
 	clc
 	ret
 
 
 count_handles:
 ;exit with cl = number of handles currently in use.
-	mov	bx,offset cgroup:handles
+	mov	bx,offset handles
 	mov	cl,0			;number of handles in use.
 count_handles_1:
 	add	cl,[bx].in_use		;is this handle in use?
 	add	bx,(size per_handle)	;go to the next handle.
-	cmp	bx,offset cgroup:end_handles
+	cmp	bx,offset end_handles
 	jb	count_handles_1
 	ret
 
@@ -930,9 +915,9 @@ verify_handle:
 ;Ensure that their handle is real.  If it isn't, we pop off our return
 ;address, and return to *their* return address with cy set.
 	mov	bx,_BX[bp]		;get the handle they gave us
-	cmp	bx,offset cgroup:handles
+	cmp	bx,offset handles
 	jb	verify_handle_bad	;no - must be bad.
-	cmp	bx,offset cgroup:end_handles
+	cmp	bx,offset end_handles
 	jae	verify_handle_bad	;no - must be bad.
 	cmp	[bx].in_use,1		;if it's not in use, it's bad.
 	jne	verify_handle_bad
@@ -960,7 +945,7 @@ set_recv_isr_1:
 	mov	their_recv_isr.segm,es
 
 	mov	ah,25h			;now set our recv interrupt.
-	mov	dx,offset cgroup:recv_isr
+	mov	dx,offset recv_isr
 	int	21h
 
 	cmp	byte ptr timer_isr,0cfh	;is there just an iret at their handler?
@@ -972,7 +957,7 @@ set_recv_isr_1:
 	mov	their_timer.segm,es
 
 	mov	ah,25h			;now set our recv interrupt.
-	mov	dx,offset cgroup:timer_isr
+	mov	dx,offset timer_isr
 	int	21h
 
 set_isr_no_timer:
@@ -1035,29 +1020,29 @@ recv_isr:
 ; no other work.  It may only touch ax and dx (the only register necessary
 ; for doing "out" instructions) unless it first pushes any other registers
 ; itself.
-	PUSH_16_32	ax
-	PUSH_16_32	dx
+	push	ax
+	push	dx
 	call	xmit
 
 ; Now switch stacks, push remaining registers, and do remaining interrupt work.
 	push	ds
 	mov	ax,cs			;ds = cs.
 	mov	ds,ax
-	assume	ds:cgroup
+	assume	ds:code
 
 	mov	savesp,sp
-	mov	sp,offset cgroup:our_stack
 	mov	savess,ss
 
 	mov	ss,ax
+	mov	sp,offset our_stack
 	cld
 
-	PUSH_16_32	bx
-	PUSH_16_32	cx
-	PUSH_16_32	si
-	PUSH_16_32	di
-	PUSH_16_32	bp
-	push		es
+	push	bx
+	push	cx
+	push	si
+	push	di
+	push	bp
+	push	es
 
 ; The following comment is wrong in that we now do a specific EOI command,
 ; and because we don't enable interrupts (even though we should).
@@ -1090,7 +1075,7 @@ recv_isr:
 	jg	recv_isr_4
 	add	al, 60h		; make specific EOI dismissal
 	out	20h, al
-	jmp	short recv_isr_3	; all done
+	jmp	recv_isr_3	; all done
 recv_isr_4:
 	add	al,60h - 8	; make specific EOI (# between 9 & 15).
 	out	0a0h,al		; Secondary 8259 (PC/AT only)
@@ -1109,20 +1094,20 @@ recv_isr_3:
 	mov	al,int_no	; Now reenable device interrupts
 	call	unmaskint
 
-	pop			es
-	POP_16_32	bp
-	POP_16_32	di
-	POP_16_32	si
-	POP_16_32	cx
-	POP_16_32	bx
+	pop	es
+	pop	bp
+	pop	di
+	pop	si
+	pop	cx
+	pop	bx
 
 	mov	ss,savess
 	mov	sp,savesp
 
-	pop			ds
+	pop	ds
 	assume	ds:nothing
-	POP_16_32	dx
-	POP_16_32	ax
+	pop	dx
+	pop	ax
 	mov	in_recv_isr, 0	; clear the re-entrancy flag - gft - 901617
 recv_iret:
 	iret
@@ -1164,7 +1149,7 @@ maskint:
 	or	al,al			;are they using a hardware interrupt?
 	je	maskint_1		;no, don't mask off the timer!
 
-	assume	ds:cgroup
+	assume	ds:code
 	mov	dx,21h			;assume the master 8259.
 	cmp	al,8			;using the slave 8259 on an AT?
 	jb	mask_not_irq2
@@ -1194,7 +1179,7 @@ maskint_1:
 	public	unmaskint
 unmaskint:
 ;exit with cl = 0 if the interrupt had been enabled.
-	assume	ds:cgroup
+	assume	ds:code
 	mov	dx,21h			;assume the master 8259.
 	mov	cl,al
 	cmp	cl,8			;using the slave 8259 on an AT?
@@ -1246,7 +1231,7 @@ recv_locate:
 ;called when we want to determine what to do with a received packet.
 ;enter with es:di -> packet type, dl = packet class.
 ;exit with cy if the packet is not desired, or nc if we know its type.
-	assume	ds:cgroup, es:nothing
+	assume	ds:code, es:nothing
 
 ; If -n option take IEEE 802.3 encapsulated packets that could be Novell IPX 
 ; and make them Ethernet encapsulated Novell IPX packets (for PDSHELL).
@@ -1274,7 +1259,7 @@ recv_not_802_3:
 recv_not_8137:
 not_n_op:
 
-	mov	bx,offset cgroup:handles
+	mov	bx,offset handles
 recv_find_1:
 	cmp	[bx].in_use,0		;is this handle in use?
 	je	recv_find_2		;no - don't check the type.
@@ -1305,7 +1290,7 @@ recv_find_7:
 	je	recv_find_3		;we've got it!
 recv_find_2:
 	add	bx,(size per_handle)	;go to the next handle.
-	cmp	bx,offset cgroup:end_handles
+	cmp	bx,offset end_handles
 	jb	recv_find_1
 
 	add2	packets_dropped,1	;count it as dropped.
@@ -1323,7 +1308,7 @@ recv_find:
 ;enter with cx = packet length, es:di -> packet type, dl = packet class.
 ;exit with es:di = 0 if the packet is not desired, or es:di -> packet buffer
 ;  to be filled by the driver.
-	assume	ds:cgroup, es:nothing
+	assume	ds:code, es:nothing
 	push	cx			;preserve packet length.
 	call	recv_locate		;search for the packet type.
 	pop	cx
@@ -1411,7 +1396,7 @@ send_queue:
 	jnz	sq_notempty		; No
 	mov	send_head.offs,di	; Set head offset
 	mov	send_head.segm,es	; Set head segment
-	jmp	short sq_settail
+	jmp	sq_settail
 sq_notempty:				; Queue is not empty
 	lds	si,send_tail		; Get tail segment:offset
 	mov	ds:[si].next.offs,di	; Set next offset
@@ -1455,11 +1440,5 @@ send_dequeue_1:
 
 
 code	ends
-
-_text	segment para public 'code'
-_text	ends
-
-init	segment para public 'code'
-init	ends
 
 	end	start

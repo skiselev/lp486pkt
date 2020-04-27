@@ -4,10 +4,8 @@
 	include	82596.inc
 	include lp486e.inc
 
-cgroup	group code, _text, init
-
-code	segment para public 'code'
-	assume	cs:cgroup, ds:cgroup
+code	segment para public
+	assume	cs:code, ds:code
 	
 	include	timeout.asm
 
@@ -17,8 +15,8 @@ extrn ether_add_msg2 : word
 	public tx_buff_no, buff_ptrs
 tx_buff_no		dw	?
 old_buff_no		dw	?
-buff_ptrs		dw	offset cgroup:cmd_buff1
-			dw	offset cgroup:cmd_buff2
+buff_ptrs		dw	offset cmd_buff1
+			dw	offset cmd_buff2
 
 rbd_counter		db	0	; Used to guard against no EOF set
 
@@ -61,7 +59,7 @@ int_num		dw	0	; Interrupt # to hook for post-EOI
 received_ours	db	0
 	public	rcv_modes
 			;number of receive modes in our table.
-rcv_modes	dw (offset cgroup:end_rcv_modes - offset cgroup:mode_zero)/2
+rcv_modes	dw (offset end_rcv_modes - offset mode_zero)/2
 mode_zero	dw	0               ;There is no mode zero
 		dw	0
 		dw	rcv_mode_2	; Individual address only
@@ -78,7 +76,7 @@ save_err	db	0		; Errors in last frame received (promiscuous mode only)
 config_start:
 ; This structure needs to be 14 bytes long but is rounded up to 16 bytes in
 ; order to make use of DWORD transfers
-	db	CB_CFIG_PREFETCH_BIT + (offset cgroup:true_config_end - offset cgroup:config_start)
+	db	CB_CFIG_PREFETCH_BIT + (offset true_config_end - offset config_start)
 	db	CB_CFIG_NO_MONITOR_MODE + DEFAULT_FIFO
 	db	40h
 	db	CB_CFIG_PREAMBLE_LEN + CB_CFIG_NO_SRCADR + CB_CFIG_ADDRESS_LEN
@@ -321,7 +319,7 @@ set_address:
 exit_set_address:
 	ret
 
-	assume	ds:cgroup
+	assume	ds:code
 rcv_mode_2:
 	and	byte ptr config_start[02h], NOT CB_CFIG_SAVE_BAD_FRAMES
 	and	byte ptr config_start[08h], NOT CB_CFIG_PROMISCUOUS
@@ -421,7 +419,7 @@ try_for_ether_buffer:
 	call	get_buffer
 	jnc	short got_ether_buffer
 	loop	try_for_ether_buffer
-	mov	dx, offset cgroup:ether_add_msg1
+	mov	dx, offset ether_add_msg1
 	stc
 	jmp	short exit_set_ether	; Exit if buffer not available
 got_ether_buffer:
@@ -435,7 +433,7 @@ got_ether_buffer:
 	rep	movsw
 	mov	di, bx			; Recover the start of the buffer
 	call	issue_cmd
-	mov	dx, offset cgroup:ether_add_msg2
+	mov	dx, offset ether_add_msg2
 exit_set_ether:
 	ret
 set_ether	ENDP
@@ -452,9 +450,9 @@ try_for_config_buffer:
 	jmp	short exit_do_config	; Exit if buffer not available
 
 got_config_buffer:
-	mov	cx, offset cgroup:config_end - offset cgroup:config_start
+	mov	cx, offset config_end - offset config_start
 	mov	bx, di			; Save the start of the buffer
-	mov	si, offset cgroup:config_start
+	mov	si, offset config_start
 	mov	eax, (EL_BIT + S_BIT + CONFIG_CMD)*10000h
 	stosd				; Store the action command word + status word
 	mov	ax, -1			; Set the address (16 bits) of next command
@@ -499,7 +497,7 @@ wait_27ms_1:
 	public	reset_interface
 reset_interface:
 ;reset the interface.
-	assume	ds:cgroup
+	assume	ds:code
 	ret
 
 ;called when we want to determine what to do with a received packet.
@@ -575,7 +573,7 @@ start_receive_unit    ENDP
 recv:
 ;called from the recv isr.  All registers have been saved, and ds=cs.
 ;Upon exit, the interrupt will be acknowledged.
-	assume	ds:cgroup
+	assume	ds:code
 
 ; FIXME - how to do this on LP486E?
 ;	LOAD_PORT	PLXP_INTERRUPT_CONTROL
@@ -665,7 +663,7 @@ got_count:
 ; Did we receive our own broadcast?
 	add	di, EADDR_LEN		; Point to the source address
 	mov	ax, di			; Save pointer to received data
-	mov	si, offset cgroup:my_address
+	mov	si, offset my_address
 	mov	cx, EADDR_LEN/2
 	repe	cmpsw
 	jne	short not_our_own	; Jump if not
@@ -770,7 +768,7 @@ no_more_1:
 	pop	cx			; And it's this long
 	assume	ds:nothing
 	call	recv_copy		; Give it to him
-	assume	ds:cgroup
+	assume	ds:code
 	mov	ax, cs			; Recover our DS
 	mov	ds, ax
 

@@ -199,35 +199,11 @@ N_OPTION	equ	4		; Novell protocol conversion
 W_OPTION	equ	8		; Windows upcall checking.
 U_OPTION	equ	10h		; Terminate the driver.
 
-print_it	macro
-	mov		ah, 9
-	int		21h
-	endm
-
 print	macro	message_param
-	mov		dx, offset cgroup:message_param
-	print_it
+	mov	dx, offset message_param
+	mov	ah, 9
+	int	21h
 	endm
-
-PUSH_16_32	MACRO	param
-ifdef REGS_R_32_BIT
-	.386
-	push	e&param
-	.8086
-else
-	push	param
-endif
-ENDM
-
-POP_16_32	MACRO	param
-ifdef REGS_R_32_BIT
-	.386
-	pop		e&param
-	.8086
-else
-	pop		param
-endif
-ENDM
 
 BIT_0	equ	0001h
 BIT_1	equ	0002h
